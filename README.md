@@ -1,1 +1,1 @@
-# padcs
+# padcs (Python Attitude Determination and Control System)
