@@ -6,9 +6,58 @@ import padcs.utils as utils
 
 class Satellite():
 
-    def __init__(self):
-        self.F_b = []       # Angle of the satellite relative to its local frame.
-        pass
+    def __init__(self, sim_time=0):
+        self.sim_time = sim_time
+        self.pos = np.empty([sim_time, 3])
+        self.vel = np.empty([sim_time, 3])
+        self.w = np.empty([sim_time, 3])
+        self.u = np.empty([sim_time, 3]) # input torque
+
+    def set_orbital_elements(self, a, e, i, raan, w, nu=0):
+        self.a = a
+        self.e = e
+        self.i = i
+        self.raan = raan
+        self.w = w
+        self.nu = nu
+
+        self.p = a * (1-e**2)
+        self.t = 2 * np.pi * np.sqrt(self.a**3 / utils.MU)
+
+    def set_quaternion(self, q_0, q_1, q_2, q_3):
+        self.q_0 = q_0
+        self.q_1 = q_1
+        self.q_2 = q_2
+        self.q_3 = q_3
+
+    def set_inertia_matrix(self, J):
+        self.J = J
+
+    def set_pos(self):
+
+        for i in range(self.sim_time):
+            r = self.p / (1+self.e * cos(self.nu))
+            self.pos[i, 0] = r * cos(self.nu)
+            self.pos[i, 1] = r * sin(self.nu)
+            self.pos[i, 2] = 0
+
+            nup = np.sqrt(utils.MU / (self.p))
+            self.vel[i][0] = nup * -sin(self.nu)
+            self.vel[i][1] = nup * (self.e + cos(self.nu))
+            self.vel[i][2] = 0
+
+            nx = self.pos[i][0] + self.vel[i][0]
+            ny = self.pos[i][1] + self.vel[i][1]
+            nr = np.sqrt(nx**2 + ny**2)
+
+            if ny > 0:
+                self.nu = arccos(nx/nr)
+            else:
+                self.nu = 2 * np.pi - arccos(nx/nr)
+
+            self.pos[i] = utils.rot_z(self.pos[i], self.w)
+            self.pos[i] = utils.rot_x(self.pos[i], self.i)
+            self.pos[i] = utils.rot_y(self.pos[i], self.raan)
 
     def set_r_and_v_from_elements(self, p, e, i, G, w, nu):
         # self.p = a * (1-e**2)
@@ -24,17 +73,13 @@ class Satellite():
         self.v[1] = np.sqrt(utils.MU/self.p) * (e+cos(nu))
         self.v[2] = 0
 
-
     def set_orbit_from_r_and_v(self, r, v):
-        """ r and v must be numpy arrays. """
-        # TODO convert r and v into numpy arrays if they are not.
-
         if not isinstance(r, np.ndarray):
             r = np.asarray(r, dtype=np.float64)
         if not isinstance(v, np.ndarray):
             v = np.asarray(v, dtype=np.float64)
 
-        self.h = np.cross(r, v)             # angular momentum vector
+        self.h = np.cross(r, v)             
         self.p = LA.norm(self.h)**2/utils.MU
         self.n = np.cross(utils.K, self.h)  # node vector (line of nodes)
         self.e = (1/utils.MU) * ( (LA.norm(v)**2 - utils.MU/LA.norm(r))*r - np.dot(r, v)*v )
