@@ -10,8 +10,9 @@ class Satellite():
         self.sim_time = sim_time
         self.pos = np.empty([sim_time, 3])
         self.vel = np.empty([sim_time, 3])
-        self.w = np.empty([sim_time, 3])
-        self.u = np.empty([sim_time, 3]) # input torque
+        self.ang = np.empty([sim_time, 3]) # (theta, phi, psi)
+        self.w_sat = np.empty([sim_time, 3])
+        self.h = np.empty([sim_time, 3]) # input torque
 
     def set_orbital_elements(self, a, e, i, raan, w, nu=0):
         self.a = a
@@ -58,6 +59,28 @@ class Satellite():
             self.pos[i] = utils.rot_z(self.pos[i], self.w)
             self.pos[i] = utils.rot_x(self.pos[i], self.i)
             self.pos[i] = utils.rot_y(self.pos[i], self.raan)
+        
+        print(self.pos[100])
+
+    def set_angle(self):
+
+        self.ang[0, 0] = 0
+        self.ang[0, 1] = self.i
+        self.ang[0, 2] = np.pi
+
+        for i in range(1, self.sim_time):
+            self.ang[i, 0] = self.ang[i-1, 0] + self.w_sat[i, 0]
+            self.ang[i, 1] = self.ang[i-1, 1] + self.w_sat[i, 1]
+            self.ang[i, 2] = self.ang[i-1, 2] + self.w_sat[i, 2]
+
+    def set_ang_vel(self):
+        # For Nadir pointing assuming s/c starts pointing at Earth.
+        self.w_0 = (2 * np.pi) / self.t
+
+        for i in range(self.sim_time):
+            self.w_sat[i, 0] = 0
+            self.w_sat[i, 1] = 0
+            self.w_sat[i, 2] = self.w_0
 
     def set_r_and_v_from_elements(self, p, e, i, G, w, nu):
         # self.p = a * (1-e**2)
