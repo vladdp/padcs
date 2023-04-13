@@ -12,7 +12,8 @@ class Satellite():
         self.vel = np.empty([sim_time, 3])
         self.ang = np.empty([sim_time, 3]) # (theta, phi, psi)
         self.w_sat = np.empty([sim_time, 3])
-        self.h = np.empty([sim_time, 3]) # input torque
+        self.q = np.empty([sim_time, 4])
+        self.u = np.empty([sim_time, 3]) # input torque
 
     def set_orbital_elements(self, a, e, i, raan, w, nu=0):
         self.a = a
@@ -25,11 +26,23 @@ class Satellite():
         self.p = a * (1-e**2)
         self.t = 2 * np.pi * np.sqrt(self.a**3 / utils.MU)
 
-    def set_quaternion(self, q_0, q_1, q_2, q_3):
-        self.q_0 = q_0
-        self.q_1 = q_1
-        self.q_2 = q_2
-        self.q_3 = q_3
+    def set_quaternion(self):
+        self.q[0, 0] = 1
+        self.q[0, 1] = 0
+        self.q[0, 2] = 0
+        self.q[0, 3] = 0
+
+        q_123 = [ [self.q[0, 0], -self.q[0, 3], self.q[0, 2]],
+                  [self.q[0, 3], self.q[0, 0], -self.q[0, 1]],
+                  [-self.q[0, 2], self.q[0, 1], self.q[0, 0]] ]
+        
+        q_dot = 0.5 * np.matmul(q_123, self.w_sat[0])
+
+        print(q_dot)
+
+    def set_quaternion_dot(self):
+
+        pass
 
     def set_inertia_matrix(self, J):
         self.J = J
@@ -58,10 +71,12 @@ class Satellite():
 
             self.pos[i] = utils.rot_z(self.pos[i], self.w)
             self.pos[i] = utils.rot_x(self.pos[i], self.i)
-            self.pos[i] = utils.rot_y(self.pos[i], self.raan)
-        
-        print(self.pos[100])
+            self.pos[i] = utils.rot_z(self.pos[i], self.raan)
 
+            self.vel[i] = utils.rot_z(self.vel[i], self.w)
+            self.vel[i] = utils.rot_x(self.vel[i], self.i)
+            self.vel[i] = utils.rot_z(self.vel[i], self.raan)
+        
     def set_angle(self):
 
         self.ang[0, 0] = 0
@@ -77,10 +92,9 @@ class Satellite():
         # For Nadir pointing assuming s/c starts pointing at Earth.
         self.w_0 = (2 * np.pi) / self.t
 
-        for i in range(self.sim_time):
-            self.w_sat[i, 0] = 0
-            self.w_sat[i, 1] = 0
-            self.w_sat[i, 2] = self.w_0
+        self.w_sat[:, 0] = 0
+        self.w_sat[:, 1] = 0
+        self.w_sat[:, 2] = self.w_0
 
     def set_r_and_v_from_elements(self, p, e, i, G, w, nu):
         # self.p = a * (1-e**2)
