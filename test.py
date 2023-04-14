@@ -22,7 +22,7 @@ J = [ [1200, 100, -200],
 a = 10000
 e = 0.8
 i = 30
-raan = 10
+raan = 100
 w = 0
 nu = 0
 
@@ -30,8 +30,11 @@ sat.set_orbital_elements(a, e, np.radians(i),
     np.radians(raan), np.radians(w), np.radians(nu))
 
 # print(sat.t)
-
+sat.set_inertia_matrix(J)
 sat.set_pos()
+
+sat.set_ang_vel()
+sat.change_to_attitude()
 
 fig, ax = plt.subplots(2, 3, figsize=(16, 9))
 title = ( f"a=%s, e=%s, i=%s, raan=%s, w=%s, nu=%s" % 
@@ -90,5 +93,12 @@ ax[1, 1].plot(sat.w_sat[:, 1], label='w_y')
 ax[1, 1].plot(sat.w_sat[:, 2], label='w_z')
 ax[1, 1].set_xlabel('time (s)')
 ax[1, 1].legend()
+
+ax[1, 2].set_title("angular acceleraction components")
+ax[1, 2].plot(sat.w_dot[:, 0], label='w_dot_x')
+ax[1, 2].plot(sat.w_dot[:, 1], label='w_dot_y')
+ax[1, 2].plot(sat.w_dot[:, 2], label='w_dot_z')
+ax[1, 2].set_xlabel('time (s)')
+ax[1, 2].legend()
 
 plt.show()

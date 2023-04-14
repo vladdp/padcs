@@ -28,6 +28,14 @@ def rot_z(xyz, theta):
             [0, 0, 1] ]
     return np.matmul(R_z, xyz)
 
+def skew(a):
+
+    a_skew = [ [0, -a[2], a[1]],
+               [a[2], 0, -a[0]],
+               [-a[1], a[0], 0] ]
+
+    return a_skew
+
 def rot_CbG(xyz, phi, theta, psi):
     CbG = [ [cos(theta)*cos(psi), cos(theta)*sin(psi), -sin(theta)],
             [sin(phi)*sin(theta)*cos(psi)-cos(phi)*sin(psi), sin(phi)*sin(theta)*sin(psi)+cos(phi)*cos(psi), sin(phi)*cos(theta)],

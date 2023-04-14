@@ -12,8 +12,37 @@ class Satellite():
         self.vel = np.empty([sim_time, 3])
         self.ang = np.empty([sim_time, 3]) # (theta, phi, psi)
         self.w_sat = np.empty([sim_time, 3])
+        self.w_dot = np.empty([sim_time, 3])
         self.q = np.empty([sim_time, 4])
         self.u = np.empty([sim_time, 3]) # input torque
+
+    def change_to_attitude(self):
+
+        self.u[0, 1] = 1
+
+        # calculate ang acc from torque
+        # self.w_dot[0] = np.matmul(self.u[0] - np.matmul(utils.skew(self.w_sat[0]), np.matmul(self.J, self.w_sat[0])), 
+        #                   LA.inv(self.J))
+        
+        # calculate ang vel from ang acc
+        # self.w_sat[1] += self.w_dot[0]
+
+        for i in range(1, self.sim_time):
+            self.w_dot[i] = np.matmul(self.u[i] - np.matmul(utils.skew(self.w_sat[i-1]), np.matmul(self.J, self.w_sat[i-1])), 
+                            LA.inv(self.J))
+
+            self.w_sat[i] += self.w_dot[i]
+            
+        
+        print(self.w_dot[1])
+        print(self.w_sat[0])
+        print(self.w_sat[1])
+
+    def set_desired_vector(self, desired):
+        self.desired = desired
+
+    def set_PID(self, p, i, d):
+        self.pid = [p, i, d]
 
     def set_orbital_elements(self, a, e, i, raan, w, nu=0):
         self.a = a
@@ -39,10 +68,6 @@ class Satellite():
         q_dot = 0.5 * np.matmul(q_123, self.w_sat[0])
 
         print(q_dot)
-
-    def set_quaternion_dot(self):
-
-        pass
 
     def set_inertia_matrix(self, J):
         self.J = J
@@ -135,6 +160,4 @@ class Satellite():
         print(np.degrees(self.i))
         print(np.degrees(self.G))
         print(np.degrees(self.w))
-        print(np.degrees(self.v_0))
-        print(np.degrees(self.u_0))
-        print(np.degrees(self.l_0))
+        print(np.degrees(self.nu))
