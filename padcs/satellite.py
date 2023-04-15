@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import sin, cos, arccos
+from numpy import sin, cos, arcsin, arccos
 import numpy.linalg as LA
 
 import padcs.utils as utils
@@ -10,33 +10,59 @@ class Satellite():
         self.sim_time = sim_time
         self.pos = np.empty([sim_time, 3])
         self.vel = np.empty([sim_time, 3])
-        self.ang = np.empty([sim_time, 3]) # (theta, phi, psi)
+        self.ang = np.empty([sim_time, 3])      # (theta, phi, psi)
         self.w_sat = np.empty([sim_time, 3])
-        self.w_dot = np.empty([sim_time, 3])
+        self.dw_sat = np.empty([sim_time, 3])
         self.q = np.empty([sim_time, 4])
-        self.u = np.empty([sim_time, 3]) # input torque
+        self.q_dot = np.empty([sim_time, 4])
+        self.q_des = np.empty([sim_time, 4])
+        self.u = np.empty([sim_time, 3])        # input torque
 
-    def change_to_attitude(self):
+        self.q[0] = [0, 1, 0, 0]                # Starting quaternion
 
-        self.u[0, 1] = 1
+        self.error = np.empty([sim_time, 4])
 
-        # calculate ang acc from torque
-        # self.w_dot[0] = np.matmul(self.u[0] - np.matmul(utils.skew(self.w_sat[0]), np.matmul(self.J, self.w_sat[0])), 
-        #                   LA.inv(self.J))
-        
-        # calculate ang vel from ang acc
-        # self.w_sat[1] += self.w_dot[0]
+    def nadir(self):
 
-        for i in range(1, self.sim_time):
-            self.w_dot[i] = np.matmul(self.u[i] - np.matmul(utils.skew(self.w_sat[i-1]), np.matmul(self.J, self.w_sat[i-1])), 
-                            LA.inv(self.J))
+        self.q_des[0] = self._to_nadir(self.pos[0])
+        r = utils.mult_q(self.q_des[0], utils.inv_q(self.q[0]))
 
-            self.w_sat[i] += self.w_dot[i]
-            
-        
-        print(self.w_dot[1])
+        print(self.q_des[0], utils.inv_q(self.q[0]))
+        print(r)
+
+        self.error[0] = self.q_des[0] - self.q[0]
+
+        self.dw_sat[0] = np.matmul( self.pid[0]*self.error[0, :3], LA.inv(self.J))
+        self.w_sat[0] = self.dw_sat[0]
         print(self.w_sat[0])
-        print(self.w_sat[1])
+
+        self.q_dot[0] = utils.calc_q_dot(self.q[0], self.w_sat[0])
+
+        self.q[1] = self.q[0] + self.q_dot[0]
+        print(self.q[0])
+        print(self.q_dot[0])
+        print(self.q[1])
+
+        for i in range(1, self.sim_time-1):
+            self.q_des[i] = self._to_nadir(self.pos[i])
+            self.error[i] = self.q_des[i] - self.q[i]
+
+            self.dw_sat[i] = np.matmul( self.pid[0]*self.error[i, :3], LA.inv(self.J))
+            self.w_sat[i] = self.w_sat[i-1] + self.dw_sat[i]
+
+            self.q_dot[i] = utils.calc_q_dot(self.q[i], self.w_sat[i])
+            self.q[i+1] = self.q[i] + self.q_dot[i]
+
+
+    def _to_nadir(self, pos):
+        r = LA.norm(pos)
+
+        q_w = 0
+        q_x = -pos[0] / r
+        q_y = -pos[1] / r
+        q_z = -pos[2] / r
+
+        return [q_w, q_x, q_y, q_z]
 
     def set_desired_vector(self, desired):
         self.desired = desired

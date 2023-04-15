@@ -36,12 +36,29 @@ def skew(a):
 
     return a_skew
 
-def rot_CbG(xyz, phi, theta, psi):
-    CbG = [ [cos(theta)*cos(psi), cos(theta)*sin(psi), -sin(theta)],
-            [sin(phi)*sin(theta)*cos(psi)-cos(phi)*sin(psi), sin(phi)*sin(theta)*sin(psi)+cos(phi)*cos(psi), sin(phi)*cos(theta)],
-            [cos(phi)*sin(theta)*cos(psi)+sin(phi)*sin(psi), cos(phi)*sin(theta)*sin(psi)-sin(phi)*cos(psi), cos(phi)*cos(theta)] ]
+def mult_q(p, q):
+    # Can replace by Eq. 3.63 from Yang
 
-    return np.matmul(CbG, xyz)
+    pv = np.array( (p[1], p[2], p[3]) )
+    qv = np.array( (q[1], q[2], q[3]) )
+    scalar = p[0] + q[0] - np.dot(pv, qv)
+    vector = p[0]*qv + q[0]*pv + np.matmul(skew(pv), qv)
+
+    return np.array( (scalar, vector[0], vector[1], vector[2]) )
+
+def inv_q(q):
+    return np.array( (q[0], -q[1], -q[2], -q[3]) )
+
+def calc_q_dot(q, w):
+
+    q = [ [q[0], -q[1], -q[2], -q[3]],
+          [q[1], q[0], -q[3], q[2]],
+          [q[2], q[3], q[0], -q[1]],
+          [q[3], -q[2], q[1], q[0]] ]
+    
+    w = [0, w[0], w[1], w[2]]
+
+    return 0.5 * np.matmul(q, w)
 
 def get_dist(a, b):
     return np.linalg.norm(a-b)
