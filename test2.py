@@ -28,42 +28,51 @@ sat.set_orbital_elements(a, e, np.radians(i),
 sat.set_inertia_matrix(J)
 sat.set_pos()
 
-sat.set_PID(0.0005, 1, 1)
+sat.set_PID(0.0001, 40, 1)
 
 sat.nadir()
 
-
 fig, ax = plt.subplots(2, 3, figsize=(16, 9))
 
-ax[0, 0].plot(sat.q_des[:, 1], label='q_des_x')
-ax[0, 0].plot(sat.q_des[:, 2], label='q_des_y')
-ax[0, 0].plot(sat.q_des[:, 3], label='q_des_z')
+ax[0, 0].plot(sat.q_des[:-1, 1], label='q_des_x')
+ax[0, 0].plot(sat.q_des[:-1, 2], label='q_des_y')
+ax[0, 0].plot(sat.q_des[:-1, 3], label='q_des_z')
 ax[0, 0].plot(sat.q[:, 1], label='q_x')
 ax[0, 0].plot(sat.q[:, 2], label='q_y')
 ax[0, 0].plot(sat.q[:, 3], label='q_z')
 ax[0, 0].legend()
 
-ax[0, 1].plot(sat.dw_sat[:, 0], label='dw_x')
-ax[0, 1].plot(sat.dw_sat[:, 1], label='dw_y')
-ax[0, 1].plot(sat.dw_sat[:, 2], label='dw_z')
+ax[0, 1].plot(sat.dw_sat[:-1, 0], label='dw_x')
+ax[0, 1].plot(sat.dw_sat[:-1, 1], label='dw_y')
+ax[0, 1].plot(sat.dw_sat[:-1, 2], label='dw_z')
 ax[0, 1].legend()
 
-ax[0, 2].plot(sat.w_sat[:, 0], label='w_x')
-ax[0, 2].plot(sat.w_sat[:, 1], label='w_y')
-ax[0, 2].plot(sat.w_sat[:, 2], label='w_z')
+ax[0, 2].plot(sat.w_sat[:-1, 0], label='w_x')
+ax[0, 2].plot(sat.w_sat[:-1, 1], label='w_y')
+ax[0, 2].plot(sat.w_sat[:-1, 2], label='w_z')
 ax[0, 2].legend()
 
-ax[1, 0].plot(sat.q_dot[:, 0], label='q_dot_w')
-ax[1, 0].plot(sat.q_dot[:, 1], label='q_dot_x')
-ax[1, 0].plot(sat.q_dot[:, 2], label='q_dot_y')
-ax[1, 0].plot(sat.q_dot[:, 3], label='q_dot_z')
+ax[1, 0].plot(sat.q_dot[:-1, 0], label='q_dot_w')
+ax[1, 0].plot(sat.q_dot[:-1, 1], label='q_dot_x')
+ax[1, 0].plot(sat.q_dot[:-1, 2], label='q_dot_y')
+ax[1, 0].plot(sat.q_dot[:-1, 3], label='q_dot_z')
 ax[1, 0].legend()
 
-ax[1, 1].plot(sat.error[:, 0], label='error_w')
-ax[1, 1].plot(sat.error[:, 1], label='error_x')
-ax[1, 1].plot(sat.error[:, 2], label='error_y')
-ax[1, 1].plot(sat.error[:, 3], label='error_z')
+ax[1, 1].plot(sat.error[:-1, 0], label='error_w')
+ax[1, 1].plot(sat.error[:-1, 1], label='error_x')
+ax[1, 1].plot(sat.error[:-1, 2], label='error_y')
+ax[1, 1].plot(sat.error[:-1, 3], label='error_z')
 ax[1, 1].legend()
+
+q_abs = np.empty([sim_time])
+
+for i in range(len(sat.q)):
+    q_abs[i] = np.linalg.norm(sat.q[i])
+
+print(q_abs.shape)
+
+ax[1, 2].plot(q_abs, label='q_abs')
+ax[1, 2].legend()
 
 plt.legend()
 plt.show()

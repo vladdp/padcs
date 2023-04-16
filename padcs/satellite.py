@@ -24,30 +24,27 @@ class Satellite():
 
     def nadir(self):
 
-        self.q_des[0] = self._to_nadir(self.pos[0])
-        r = utils.mult_q(self.q_des[0], utils.inv_q(self.q[0]))
-
-        print(self.q_des[0], utils.inv_q(self.q[0]))
-        print(r)
+        # self.q_des[0] = self._to_nadir(self.pos[0])
+        self.q_des[0] = [0, -1, 0, 0]
 
         self.error[0] = self.q_des[0] - self.q[0]
 
-        self.dw_sat[0] = np.matmul( self.pid[0]*self.error[0, :3], LA.inv(self.J))
+        control = self.pid[0]*self.error[0, :3] + self.pid[1]*(self.error[0, :3])
+
+        self.dw_sat[0] = np.matmul( control, LA.inv(self.J))
         self.w_sat[0] = self.dw_sat[0]
-        print(self.w_sat[0])
 
         self.q_dot[0] = utils.calc_q_dot(self.q[0], self.w_sat[0])
 
         self.q[1] = self.q[0] + self.q_dot[0]
-        print(self.q[0])
-        print(self.q_dot[0])
-        print(self.q[1])
 
         for i in range(1, self.sim_time-1):
-            self.q_des[i] = self._to_nadir(self.pos[i])
+            # self.q_des[i] = self._to_nadir(self.pos[i])
+            self.q_des[i] = [0, -1, 0, 0]
             self.error[i] = self.q_des[i] - self.q[i]
 
-            self.dw_sat[i] = np.matmul( self.pid[0]*self.error[i, :3], LA.inv(self.J))
+            control = self.pid[0]*self.error[i, :3] + self.pid[1]*(self.error[i, :3]-self.error[i-1, :3])
+            self.dw_sat[i] = np.matmul( control, LA.inv(self.J) )
             self.w_sat[i] = self.w_sat[i-1] + self.dw_sat[i]
 
             self.q_dot[i] = utils.calc_q_dot(self.q[i], self.w_sat[i])
