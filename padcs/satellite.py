@@ -16,40 +16,104 @@ class Satellite():
         self.q = np.empty([sim_time, 4])
         self.q_dot = np.empty([sim_time, 4])
         self.q_des = np.empty([sim_time, 4])
+        self.q_e = np.empty([sim_time, 4])
         self.u = np.empty([sim_time, 3])        # input torque
 
-        self.q[0] = [0, 1, 0, 0]                # Starting quaternion
+        self.c_q = np.empty([sim_time])
+        self.c_q[0] = 1
 
-        self.error = np.empty([sim_time, 4])
+        self.e_sum = 0
+
+        self.J_theta_dot = np.empty([sim_time, 3])
+
+    def to_attitude(self, q, q_des, mu=1):
+        self.q[0] = q
+        self.q_des[0] = q_des
+        self.q_e[0] = utils.calc_q_e(self.q[0], self.q_des[0])
+        self.q_e[0] /= LA.norm(self.q_e[0])
+
+        # u = -mu*Omega*J*w - D*w - sign(q4(0))*K*q
+        self.u[0] = np.matmul(np.matmul(utils.skew(-mu*self.w_sat[0]), self.J), self.w_sat[0]) \
+                    - np.matmul(self.D, self.w_sat[0]) \
+                    - np.sign(q[3]) * np.matmul(self.K, self.q_e[0, :3])
+
+        # J_dw = Omega*J*w + u
+        self.dw_sat[0] = np.matmul(np.matmul(utils.skew(self.w_sat[0]), self.J), self.w_sat[0]) + self.u[0]
+        # dw = ^ / J
+        self.dw_sat[0] = np.matmul(self.dw_sat[0], LA.inv(self.J))
+
+        # dq = 0.5*Omega*q + 0.5*q_4*w
+        self.q_dot[0, :3] = 0.5 * np.matmul(utils.skew(self.w_sat[0]), self.q_e[0, :3]) \
+                            + 0.5 * self.q_e[0, 3]*self.w_sat[0]
+        # dw_4 = -0.5*w*q
+        self.q_dot[0, 3] = -0.5 * np.matmul(self.w_sat[0], self.q_e[0, :3])
+
+        self.w_sat[1] = self.w_sat[0] + self.dw_sat[0]
+        self.q[1] = self.q[0] + self.q_dot[0]
+        self.q[1] /= LA.norm(self.q[1])
+
+        for i in range(1, self.sim_time-1):
+            self.q_e[i] = utils.calc_q_e(self.q[i], self.q_des[0])
+            self.q_e[i] /= LA.norm(self.q_e[i])
+            self.u[i] = np.matmul(np.matmul(utils.skew(-mu*self.w_sat[i]), self.J), self.w_sat[i]) \
+                    - np.matmul(self.D, self.w_sat[i]) \
+                    - np.sign(q[3]) * np.matmul(self.K, self.q_e[i, :3])
+            self.dw_sat[i] = np.matmul(np.matmul(utils.skew(self.w_sat[i]), self.J), self.w_sat[i]) + self.u[i]
+            self.dw_sat[i] = np.matmul(self.dw_sat[i], LA.inv(self.J))
+
+            self.q_dot[i, :3] = 0.5 * np.matmul(utils.skew(self.w_sat[i]), self.q_e[i, :3]) \
+                            + 0.5 * self.q_e[i, 3]*self.w_sat[i]
+            self.q_dot[i, 3] = -0.5 * np.matmul(self.w_sat[i], self.q_e[i, :3])
+
+            self.w_sat[i+1] = self.w_sat[i] + self.dw_sat[i]
+            self.q[i+1] = self.q[i] + self.q_dot[i]
+            self.q[i+1] /= LA.norm(self.q[i+1])
+
+
+    def set_gains(self, k, d):
+        self.k = k
+        self.d = d
+
+        self.K = np.array( k*self.J )
+        self.D = np.array( d*self.J )
 
     def nadir(self):
 
         # self.q_des[0] = self._to_nadir(self.pos[0])
         self.q_des[0] = [0, -1, 0, 0]
 
-        self.error[0] = self.q_des[0] - self.q[0]
+        # self.q_e[0] = self.q_des[0] - self.q[0]
+        self.q_e[0] = utils.calc_q_e(self.q_des[0], self.q[0])
+        self.e_sum += self.q_e[0]
 
-        control = self.pid[0]*self.error[0, :3] + self.pid[1]*(self.error[0, :3])
+        self.J_theta_dot[0] = self.pid[0]*self.q_e[0, 1:] + self.pid[2]*(self.q_e[0, 1:]) \
+                    + self.pid[1]*self.e_sum[1:]
 
-        self.dw_sat[0] = np.matmul( control, LA.inv(self.J))
+        # self.dw_sat[0] = np.matmul( self.J_theta_dot[0], LA.inv(self.J))
+        self.dw_sat[0] = self.J_theta_dot[0] / (LA.norm(self.J))
         self.w_sat[0] = self.dw_sat[0]
 
         self.q_dot[0] = utils.calc_q_dot(self.q[0], self.w_sat[0])
 
         self.q[1] = self.q[0] + self.q_dot[0]
+        self.q[1] /= LA.norm(self.q[1])
 
         for i in range(1, self.sim_time-1):
             # self.q_des[i] = self._to_nadir(self.pos[i])
             self.q_des[i] = [0, -1, 0, 0]
-            self.error[i] = self.q_des[i] - self.q[i]
+            # self.q_e[i] = self.q_des[i] - self.q[i]
+            self.q_e[i] = utils.calc_q_e(self.q_des[i], self.q[i])
+            self.e_sum += self.q_e[i]
 
-            control = self.pid[0]*self.error[i, :3] + self.pid[1]*(self.error[i, :3]-self.error[i-1, :3])
-            self.dw_sat[i] = np.matmul( control, LA.inv(self.J) )
+            self.J_theta_dot[i] = self.pid[0]*self.q_e[i, 1:] + self.pid[2]*(self.q_e[i, 1:]-self.q_e[i-1, 1:]) \
+                    + self.pid[1]*self.e_sum[1:]
+            # self.dw_sat[i] = np.matmul( control, LA.inv(self.J) )
+            self.dw_sat[i] = self.J_theta_dot[i] / LA.norm(self.J)
             self.w_sat[i] = self.w_sat[i-1] + self.dw_sat[i]
 
             self.q_dot[i] = utils.calc_q_dot(self.q[i], self.w_sat[i])
             self.q[i+1] = self.q[i] + self.q_dot[i]
-
+            self.q[i+1] /= LA.norm(self.q[i+1])
 
     def _to_nadir(self, pos):
         r = LA.norm(pos)
@@ -136,13 +200,8 @@ class Satellite():
             self.ang[i, 1] = self.ang[i-1, 1] + self.w_sat[i, 1]
             self.ang[i, 2] = self.ang[i-1, 2] + self.w_sat[i, 2]
 
-    def set_ang_vel(self):
-        # For Nadir pointing assuming s/c starts pointing at Earth.
-        self.w_0 = (2 * np.pi) / self.t
-
-        self.w_sat[:, 0] = 0
-        self.w_sat[:, 1] = 0
-        self.w_sat[:, 2] = self.w_0
+    def set_ang_vel(self, w):
+        self.w_sat[0] = w
 
     def set_r_and_v_from_elements(self, p, e, i, G, w, nu):
         # self.p = a * (1-e**2)

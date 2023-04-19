@@ -60,5 +60,22 @@ def calc_q_dot(q, w):
 
     return 0.5 * np.matmul(q, w)
 
+def calc_q_dot_3(q, w):
+
+    q = [ [0, -q[3], q[2]],
+          [q[3], 0, -q[1]],
+          [-q[2], q[1], 0]]
+
+    return 0.5 * np.matmul(q, w)
+
+def calc_q_e(q, des):
+
+    des = [ [des[3], des[2], -des[1], -des[0]],
+            [-des[2], des[3], des[0], -des[1]],
+            [des[1], -des[0], des[3], -des[2]],
+            [des[0], des[1], des[2], des[3]] ]
+
+    return np.matmul(des, q)
+
 def get_dist(a, b):
     return np.linalg.norm(a-b)
