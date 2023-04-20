@@ -2,6 +2,8 @@ import numpy as np
 from numpy import sin, cos, arcsin, arccos
 import numpy.linalg as LA
 
+import matplotlib.pyplot as plt
+
 import padcs.utils as utils
 
 class Satellite():
@@ -29,40 +31,20 @@ class Satellite():
     def to_attitude(self, q, q_des, mu=1):
         self.q[0] = q
         self.q_des[0] = q_des
-        self.q_e[0] = utils.calc_q_e(self.q[0], self.q_des[0])
-        self.q_e[0] /= LA.norm(self.q_e[0])
+        sign = np.sign(q[3])
 
-        # u = -mu*Omega*J*w - D*w - sign(q4(0))*K*q
-        self.u[0] = np.matmul(np.matmul(utils.skew(-mu*self.w_sat[0]), self.J), self.w_sat[0]) \
-                    - np.matmul(self.D, self.w_sat[0]) \
-                    - np.sign(q[3]) * np.matmul(self.K, self.q_e[0, :3])
-
-        # J_dw = Omega*J*w + u
-        self.dw_sat[0] = np.matmul(np.matmul(utils.skew(self.w_sat[0]), self.J), self.w_sat[0]) + self.u[0]
-        # dw = ^ / J
-        self.dw_sat[0] = np.matmul(self.dw_sat[0], LA.inv(self.J))
-
-        # dq = 0.5*Omega*q + 0.5*q_4*w
-        self.q_dot[0, :3] = 0.5 * np.matmul(utils.skew(self.w_sat[0]), self.q_e[0, :3]) \
-                            + 0.5 * self.q_e[0, 3]*self.w_sat[0]
-        # dw_4 = -0.5*w*q
-        self.q_dot[0, 3] = -0.5 * np.matmul(self.w_sat[0], self.q_e[0, :3])
-
-        self.w_sat[1] = self.w_sat[0] + self.dw_sat[0]
-        self.q[1] = self.q[0] + self.q_dot[0]
-        self.q[1] /= LA.norm(self.q[1])
-
-        for i in range(1, self.sim_time-1):
+        for i in range(0, self.sim_time-1):
             self.q_e[i] = utils.calc_q_e(self.q[i], self.q_des[0])
             self.q_e[i] /= LA.norm(self.q_e[i])
+
             self.u[i] = np.matmul(np.matmul(utils.skew(-mu*self.w_sat[i]), self.J), self.w_sat[i]) \
-                    - np.matmul(self.D, self.w_sat[i]) \
-                    - np.sign(q[3]) * np.matmul(self.K, self.q_e[i, :3])
+                        - np.matmul(self.D, self.w_sat[i]) \
+                        - sign * np.matmul(self.K, self.q_e[i, :3])
             self.dw_sat[i] = np.matmul(np.matmul(utils.skew(self.w_sat[i]), self.J), self.w_sat[i]) + self.u[i]
             self.dw_sat[i] = np.matmul(self.dw_sat[i], LA.inv(self.J))
 
             self.q_dot[i, :3] = 0.5 * np.matmul(utils.skew(self.w_sat[i]), self.q_e[i, :3]) \
-                            + 0.5 * self.q_e[i, 3]*self.w_sat[i]
+                                + 0.5 * self.q_e[i, 3]*self.w_sat[i]
             self.q_dot[i, 3] = -0.5 * np.matmul(self.w_sat[i], self.q_e[i, :3])
 
             self.w_sat[i+1] = self.w_sat[i] + self.dw_sat[i]
@@ -157,9 +139,11 @@ class Satellite():
         print(q_dot)
 
     def set_inertia_matrix(self, J):
-        self.J = J
+        self.J = np.array( [ [J[0][0], 0, 0],
+                             [0, J[1][1], 0],
+                             [0, 0, J[2][2]] ] )
 
-    def set_pos(self):
+    def set_orbit(self):
 
         for i in range(self.sim_time):
             r = self.p / (1+self.e * cos(self.nu))
@@ -233,6 +217,77 @@ class Satellite():
         self.v_0 = arccos(np.dot(self.e, r) / (LA.norm(self.e)*LA.norm(r)))
         self.u_0 = arccos(np.dot(self.n, r) / (LA.norm(self.n)*LA.norm(r)))
         self.l_0 = self.G + self.u_0
+
+    def plot_orbit(self):
+        fig, ax = plt.subplots(1, 3, figsize=(18, 6))
+
+        ax[0].set_title('x, y, z values over time')
+        ax[0].plot(self.pos[:, 0], label='x')
+        ax[0].plot(self.pos[:, 1], label='y')
+        ax[0].plot(self.pos[:, 2], label='z')
+        ax[0].set_xlabel('Time (s)')
+        ax[0].set_ylabel('Position (km)')
+        ax[0].legend()
+
+        ax[1].set_title('2d orbit planes')
+        ax[1].plot(self.pos[:, 0], self.pos[:, 1], label='xy')
+        ax[1].plot(self.pos[:, 0], self.pos[:, 2], label='xz')
+        ax[1].plot(self.pos[:, 1], self.pos[:, 2], label='yz')
+        ax[1].axis('equal')
+        ax[1].set_xlabel('Position (km)')
+        ax[1].set_ylabel('Position (km)')
+        ax[1].legend()
+
+        ax[2].set_title('velocity components')
+        ax[2].plot(self.vel[:, 0], label='v_x')
+        ax[2].plot(self.vel[:, 1], label='v_y')
+        ax[2].plot(self.vel[:, 2], label='v_z')
+        ax[2].set_xlabel('Time (s)')
+        ax[2].set_ylabel('Velocity (km/s)')
+        ax[2].legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_q(self):
+        fig, ax = plt.subplots(2, 2, figsize=(16, 9))
+
+        ax[0, 0].set_title('Quaternion vs Time')
+        ax[0, 0].plot(self.q[:, 0], label='q_x')
+        ax[0, 0].plot(self.q[:, 1], label='q_y')
+        ax[0, 0].plot(self.q[:, 2], label='q_z')
+        ax[0, 0].plot(self.q[:, 3], label='q_w')
+        ax[0, 0].set_xlabel('Time (s)')
+        ax[0, 0].set_ylabel('Quaternion Value')
+        ax[0, 0].legend()
+
+        ax[0, 1].set_title('Input Torque vs Time')
+        ax[0, 1].plot(self.u[:-1, 0], label='u_x')
+        ax[0, 1].plot(self.u[:-1, 1], label='u_y')
+        ax[0, 1].plot(self.u[:-1, 2], label='u_z')
+        ax[0, 1].set_xlabel('Time (s)')
+        ax[0, 1].set_ylabel('Torque (Nm)')
+        ax[0, 1].legend()
+
+        ax[1, 0].set_title('Angular Velocity vs Time')
+        ax[1, 0].plot(self.w_sat[:, 0], label='w_x')
+        ax[1, 0].plot(self.w_sat[:, 1], label='w_y')
+        ax[1, 0].plot(self.w_sat[:, 2], label='w_z')
+        ax[1, 0].set_xlabel('Time (s)')
+        ax[1, 0].set_ylabel('Angular Velocity (rad/s)')
+        ax[1, 0].legend()
+
+        ax[1, 1].set_title('Error Quaternion vs Time')
+        ax[1, 1].plot(self.q_e[:-1, 0], label='q_e_x')
+        ax[1, 1].plot(self.q_e[:-1, 1], label='q_e_y')
+        ax[1, 1].plot(self.q_e[:-1, 2], label='q_e_z')
+        ax[1, 1].plot(self.q_e[:-1, 3], label='q_e_w')
+        ax[1, 1].set_xlabel('Time (s)')
+        ax[1, 1].set_ylabel('Quaternion Value')
+        ax[1, 1].legend()
+
+        plt.tight_layout()
+        plt.show()
 
     def print_elements(self):
         print(self.h)
