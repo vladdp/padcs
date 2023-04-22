@@ -12,7 +12,6 @@ class Satellite():
         self.sim_time = sim_time
         self.pos = np.empty([sim_time, 3])
         self.vel = np.empty([sim_time, 3])
-        self.ang = np.empty([sim_time, 3])      # (theta, phi, psi)
         self.w_sat = np.empty([sim_time, 3])
         self.dw_sat = np.empty([sim_time, 3])
         self.q = np.empty([sim_time, 4])
@@ -28,7 +27,7 @@ class Satellite():
 
         self.J_theta_dot = np.empty([sim_time, 3])
 
-    def to_attitude(self, q, q_des, mu=1):
+    def to_attitude_wie(self, q, q_des, mu=1):
         self.q[0] = q
         self.q_des[0] = q_des
         sign = np.sign(q[3])
@@ -51,6 +50,10 @@ class Satellite():
             self.q[i+1] = self.q[i] + self.q_dot[i]
             self.q[i+1] /= LA.norm(self.q[i+1])
 
+    def point_nadir(self, q, mu=1):
+        self.q[0] = q
+        self.q_des[0] = self._to_nadir()
+
 
     def set_gains(self, k, d):
         self.k = k
@@ -59,56 +62,18 @@ class Satellite():
         self.K = np.array( k*self.J )
         self.D = np.array( d*self.J )
 
-    def nadir(self):
-
-        # self.q_des[0] = self._to_nadir(self.pos[0])
-        self.q_des[0] = [0, -1, 0, 0]
-
-        # self.q_e[0] = self.q_des[0] - self.q[0]
-        self.q_e[0] = utils.calc_q_e(self.q_des[0], self.q[0])
-        self.e_sum += self.q_e[0]
-
-        self.J_theta_dot[0] = self.pid[0]*self.q_e[0, 1:] + self.pid[2]*(self.q_e[0, 1:]) \
-                    + self.pid[1]*self.e_sum[1:]
-
-        # self.dw_sat[0] = np.matmul( self.J_theta_dot[0], LA.inv(self.J))
-        self.dw_sat[0] = self.J_theta_dot[0] / (LA.norm(self.J))
-        self.w_sat[0] = self.dw_sat[0]
-
-        self.q_dot[0] = utils.calc_q_dot(self.q[0], self.w_sat[0])
-
-        self.q[1] = self.q[0] + self.q_dot[0]
-        self.q[1] /= LA.norm(self.q[1])
-
-        for i in range(1, self.sim_time-1):
-            # self.q_des[i] = self._to_nadir(self.pos[i])
-            self.q_des[i] = [0, -1, 0, 0]
-            # self.q_e[i] = self.q_des[i] - self.q[i]
-            self.q_e[i] = utils.calc_q_e(self.q_des[i], self.q[i])
-            self.e_sum += self.q_e[i]
-
-            self.J_theta_dot[i] = self.pid[0]*self.q_e[i, 1:] + self.pid[2]*(self.q_e[i, 1:]-self.q_e[i-1, 1:]) \
-                    + self.pid[1]*self.e_sum[1:]
-            # self.dw_sat[i] = np.matmul( control, LA.inv(self.J) )
-            self.dw_sat[i] = self.J_theta_dot[i] / LA.norm(self.J)
-            self.w_sat[i] = self.w_sat[i-1] + self.dw_sat[i]
-
-            self.q_dot[i] = utils.calc_q_dot(self.q[i], self.w_sat[i])
-            self.q[i+1] = self.q[i] + self.q_dot[i]
-            self.q[i+1] /= LA.norm(self.q[i+1])
-
     def _to_nadir(self, pos):
         r = LA.norm(pos)
 
-        q_w = 0
+        q_w = 1
         q_x = -pos[0] / r
         q_y = -pos[1] / r
         q_z = -pos[2] / r
 
-        return [q_w, q_x, q_y, q_z]
+        q = np.array( [q_x, q_y, q_z, q_w] )
+        q /= LA.norm(q)
 
-    def set_desired_vector(self, desired):
-        self.desired = desired
+        return q
 
     def set_PID(self, p, i, d):
         self.pid = [p, i, d]
@@ -123,20 +88,6 @@ class Satellite():
 
         self.p = a * (1-e**2)
         self.t = 2 * np.pi * np.sqrt(self.a**3 / utils.MU)
-
-    def set_quaternion(self):
-        self.q[0, 0] = 1
-        self.q[0, 1] = 0
-        self.q[0, 2] = 0
-        self.q[0, 3] = 0
-
-        q_123 = [ [self.q[0, 0], -self.q[0, 3], self.q[0, 2]],
-                  [self.q[0, 3], self.q[0, 0], -self.q[0, 1]],
-                  [-self.q[0, 2], self.q[0, 1], self.q[0, 0]] ]
-        
-        q_dot = 0.5 * np.matmul(q_123, self.w_sat[0])
-
-        print(q_dot)
 
     def set_inertia_matrix(self, J):
         self.J = np.array( [ [J[0][0], 0, 0],
@@ -172,34 +123,9 @@ class Satellite():
             self.vel[i] = utils.rot_z(self.vel[i], self.w)
             self.vel[i] = utils.rot_x(self.vel[i], self.i)
             self.vel[i] = utils.rot_z(self.vel[i], self.raan)
-        
-    def set_angle(self):
-
-        self.ang[0, 0] = 0
-        self.ang[0, 1] = self.i
-        self.ang[0, 2] = np.pi
-
-        for i in range(1, self.sim_time):
-            self.ang[i, 0] = self.ang[i-1, 0] + self.w_sat[i, 0]
-            self.ang[i, 1] = self.ang[i-1, 1] + self.w_sat[i, 1]
-            self.ang[i, 2] = self.ang[i-1, 2] + self.w_sat[i, 2]
 
     def set_ang_vel(self, w):
         self.w_sat[0] = w
-
-    def set_r_and_v_from_elements(self, p, e, i, G, w, nu):
-        # self.p = a * (1-e**2)
-        self.p = p
-
-        self.radius = self.p / (1+e*cos(nu))
-        self.r = np.empty(3)
-        self.v = np.empty(3)
-        self.r[0] = self.radius*cos(nu)
-        self.r[1] = self.radius*sin(nu)
-        self.r[2] = 0
-        self.v[0] = np.sqrt(utils.MU/self.p) * -sin(nu)
-        self.v[1] = np.sqrt(utils.MU/self.p) * (e+cos(nu))
-        self.v[2] = 0
 
     def set_orbit_from_r_and_v(self, r, v):
         if not isinstance(r, np.ndarray):
@@ -288,13 +214,3 @@ class Satellite():
 
         plt.tight_layout()
         plt.show()
-
-    def print_elements(self):
-        print(self.h)
-        print(self.p)
-        print(self.n)
-        print(self.e)
-        print(np.degrees(self.i))
-        print(np.degrees(self.G))
-        print(np.degrees(self.w))
-        print(np.degrees(self.nu))
