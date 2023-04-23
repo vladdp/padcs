@@ -13,7 +13,7 @@ J = [ [1200, 0, 0],
 
 sat.set_inertia_matrix(J)
 
-q_des = np.array( [1, 0, 0, 0.5] )
+q_des = np.array( [1, 0, 0, 0.0] )
 q_des /= np.linalg.norm(q_des)
 
 q_initial = np.array( [0.57, 0.57, 0.57, 0.159] )

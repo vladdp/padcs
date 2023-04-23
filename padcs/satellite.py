@@ -52,7 +52,26 @@ class Satellite():
 
     def point_nadir(self, q, mu=1):
         self.q[0] = q
-        self.q_des[0] = self._to_nadir()
+        sign = np.sign(q[3])    # update sign if q_des updates?
+
+        for i in range(0, self.sim_time-1):
+            self.q_des[i] = self._to_nadir(self.pos[i])
+            self.q_e[i] = utils.calc_q_e(self.q[i], self.q_des[i])
+            self.q_e[i] /= LA.norm(self.q_e[i])
+
+            self.u[i] = np.matmul(np.matmul(utils.skew(-mu*self.w_sat[i]), self.J), self.w_sat[i]) \
+                        - np.matmul(self.D, self.w_sat[i]) \
+                        - sign * np.matmul(self.K, self.q_e[i, :3])
+            self.dw_sat[i] = np.matmul(np.matmul(utils.skew(self.w_sat[i]), self.J), self.w_sat[i]) + self.u[i]
+            self.dw_sat[i] = np.matmul(self.dw_sat[i], LA.inv(self.J))
+
+            self.q_dot[i, :3] = 0.5 * np.matmul(utils.skew(self.w_sat[i]), self.q_e[i, :3]) \
+                                + 0.5 * self.q_e[i, 3]*self.w_sat[i]
+            self.q_dot[i, 3] = -0.5 * np.matmul(self.w_sat[i], self.q_e[i, :3])
+
+            self.w_sat[i+1] = self.w_sat[i] + self.dw_sat[i]
+            self.q[i+1] = self.q[i] + self.q_dot[i]
+            self.q[i+1] /= LA.norm(self.q[i+1])
 
 
     def set_gains(self, k, d):
@@ -65,10 +84,10 @@ class Satellite():
     def _to_nadir(self, pos):
         r = LA.norm(pos)
 
-        q_w = 1
         q_x = -pos[0] / r
         q_y = -pos[1] / r
         q_z = -pos[2] / r
+        q_w = 1
 
         q = np.array( [q_x, q_y, q_z, q_w] )
         q /= LA.norm(q)
@@ -175,7 +194,7 @@ class Satellite():
         plt.tight_layout()
         plt.show()
 
-    def plot_q(self):
+    def plot_q(self, show_des=False, u_start=0):
         fig, ax = plt.subplots(2, 2, figsize=(16, 9))
 
         ax[0, 0].set_title('Quaternion vs Time')
@@ -183,6 +202,11 @@ class Satellite():
         ax[0, 0].plot(self.q[:, 1], label='q_y')
         ax[0, 0].plot(self.q[:, 2], label='q_z')
         ax[0, 0].plot(self.q[:, 3], label='q_w')
+        if show_des:
+            ax[0, 0].plot(self.q_des[:-1, 0], label='q_des_x', linestyle='dashed')
+            ax[0, 0].plot(self.q_des[:-1, 1], label='q_des_y', linestyle='dashed')
+            ax[0, 0].plot(self.q_des[:-1, 2], label='q_des_z', linestyle='dashed')
+            ax[0, 0].plot(self.q_des[:-1, 3], label='q_des_w', linestyle='dashed')
         ax[0, 0].set_xlabel('Time (s)')
         ax[0, 0].set_ylabel('Quaternion Value')
         ax[0, 0].legend()
@@ -211,6 +235,19 @@ class Satellite():
         ax[1, 1].set_xlabel('Time (s)')
         ax[1, 1].set_ylabel('Quaternion Value')
         ax[1, 1].legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_u(self, start, end):
+        x = range(start, end)
+        plt.title('Input Torque vs Time')
+        plt.plot(x, self.u[start:end, 0], label='u_x')
+        plt.plot(x, self.u[start:end, 1], label='u_y')
+        plt.plot(x, self.u[start:end, 2], label='u_z')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Input Torque (Nm)')
+        plt.legend()
 
         plt.tight_layout()
         plt.show()
