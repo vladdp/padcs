@@ -4,7 +4,7 @@ from padcs.satellite import Satellite
 
 # Testing nadir pointing given an orbit
 
-sim_time = 100
+sim_time = 10000
 
 sat = Satellite(sim_time)
 
@@ -24,7 +24,7 @@ sat.set_gains(k, d)
 sat.set_ang_vel(w_0)
 
 a = 7000
-e = 0.5
+e = 0
 i = 0
 raan = 0
 w = 0
@@ -35,5 +35,5 @@ sat.set_orbit()
 # sat.plot_orbit()
 
 sat.point_nadir(q_initial, mu=mu)
-sat.plot_q(show_des=True, norm_u=False)
+sat.plot_q(show_des=True, norm_u=True, norm_w=True)
 # sat.plot_u(1000, sim_time)

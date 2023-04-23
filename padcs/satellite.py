@@ -193,7 +193,7 @@ class Satellite():
         plt.tight_layout()
         plt.show()
 
-    def plot_q(self, show_des=False, norm_u=False):
+    def plot_q(self, show_des=False, norm_u=False, norm_w=False):
         fig, ax = plt.subplots(2, 2, figsize=(16, 9))
 
         ax[0, 0].set_title('Quaternion vs Time')
@@ -217,8 +217,9 @@ class Satellite():
         ax[0, 1].set_xlabel('Time (s)')
         ax[0, 1].set_ylabel('Torque (Nm)')
         if norm_u:
-            mean = np.mean(self.u)
-            std = np.std(self.u)
+            start = int(self.sim_time / 200) + 1
+            mean = np.mean(self.u[start:])
+            std = np.std(self.u[start:])
             ly = mean - std
             uy = mean + std
             ax[0, 1].set_ylim((ly, uy))
@@ -230,6 +231,13 @@ class Satellite():
         ax[1, 0].plot(self.w_sat[:, 2], label='w_z')
         ax[1, 0].set_xlabel('Time (s)')
         ax[1, 0].set_ylabel('Angular Velocity (rad/s)')
+        if norm_w:
+            start = int(self.sim_time / 500) + 1
+            mean = np.mean(self.w_sat[start:])
+            std = np.std(self.w_sat[start:])
+            ly = mean - std
+            uy = mean + std
+            ax[1, 0].set_ylim((ly, uy))
         ax[1, 0].legend()
 
         ax[1, 1].set_title('Error Quaternion vs Time')
