@@ -73,7 +73,6 @@ class Satellite():
             self.q[i+1] = self.q[i] + self.q_dot[i]
             self.q[i+1] /= LA.norm(self.q[i+1])
 
-
     def set_gains(self, k, d):
         self.k = k
         self.d = d
@@ -194,7 +193,7 @@ class Satellite():
         plt.tight_layout()
         plt.show()
 
-    def plot_q(self, show_des=False, u_start=0):
+    def plot_q(self, show_des=False, norm_u=False):
         fig, ax = plt.subplots(2, 2, figsize=(16, 9))
 
         ax[0, 0].set_title('Quaternion vs Time')
@@ -217,6 +216,12 @@ class Satellite():
         ax[0, 1].plot(self.u[:-1, 2], label='u_z')
         ax[0, 1].set_xlabel('Time (s)')
         ax[0, 1].set_ylabel('Torque (Nm)')
+        if norm_u:
+            mean = np.mean(self.u)
+            std = np.std(self.u)
+            ly = mean - std
+            uy = mean + std
+            ax[0, 1].set_ylim((ly, uy))
         ax[0, 1].legend()
 
         ax[1, 0].set_title('Angular Velocity vs Time')

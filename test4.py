@@ -1,12 +1,10 @@
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 from padcs.satellite import Satellite
 
 # Testing nadir pointing given an orbit
 
-sim_time = 10000
+sim_time = 100
 
 sat = Satellite(sim_time)
 
@@ -37,5 +35,5 @@ sat.set_orbit()
 # sat.plot_orbit()
 
 sat.point_nadir(q_initial, mu=mu)
-sat.plot_q(show_des=True)
+sat.plot_q(show_des=True, norm_u=False)
 # sat.plot_u(1000, sim_time)
